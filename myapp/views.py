@@ -1,10 +1,8 @@
-from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework import authentication, permissions
 from django.db.models import Sum
 from .models import User, Income, Expense
 from rest_framework import status
-from rest_framework.authtoken.models import Token 
 from rest_framework.permissions import IsAuthenticated
 from datetime import datetime
 from decimal import Decimal
@@ -15,15 +13,6 @@ from decimal import Decimal
 
 @api_view(['POST'])
 def register_user(request):
-    """
-    Register a new user.
-    Expected JSON body:
-    {
-        "name": "John Doe",
-        "email": "john@example.com",
-        "password": "securepassword"
-    }
-    """
 
     data = request.data
     name = data.get('name')
@@ -31,16 +20,22 @@ def register_user(request):
     password = data.get('password')
 
     if not all([name, email, password]):
-        return Response({"error": "Name, email and password are required."},
-                        status=status.HTTP_400_BAD_REQUEST)
-    
-    if User.objects.filter(email = email).exists():
-        return Response({"error": "Email is already registered."},
-                        status=status.HTTP_400_BAD_REQUEST)
-    
-    user = User.objects.create_user(name=name, email=email, password=password)
+        return Response(
+            {"error": "Name, email and password are required."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
-    token, _ = Token.objects.get_or_create(user=user)
+    if User.objects.filter(email=email).exists():
+        return Response(
+            {"error": "Email is already registered."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    user = User.objects.create_user(
+        email=email,
+        password=password,
+        name=name
+    )
 
     return Response({
         "message": "User registered successfully.",
@@ -48,11 +43,10 @@ def register_user(request):
             "id": user.id,
             "name": user.name,
             "email": user.email
-        },
-        "token": token.key
+        }
     }, status=status.HTTP_201_CREATED)
 
-
+    
 
 @api_view(['POST', 'GET'])
 @permission_classes([IsAuthenticated])
@@ -140,7 +134,7 @@ def expense_list_create(request):
 
         return Response({
             "message": "Expense added successfully.",
-            "expence": {
+            "expense": {
                 "id" : expense.id,
                 "amount" : str(expense.amount),
                 "category" : expense.get_exp_category_display(),
@@ -152,7 +146,7 @@ def expense_list_create(request):
     
     elif request.method == 'GET':
         expenses = Expense.objects.filter(user=user).order_by('-date')
-        expence_list = [{
+        expense_list = [{
             "id": i.id,
             "amount": str(i.amount),
             "category": i.get_exp_category_display(),
@@ -161,7 +155,7 @@ def expense_list_create(request):
             "is_recurring": i.is_recurring
         } for i in expenses]
 
-        return Response(expence_list, status = status.HTTP_200_OK)
+        return Response(expense_list, status = status.HTTP_200_OK)
     
 
 @api_view(['GET'])
@@ -178,21 +172,20 @@ def budget_view(request):
         user=user,
         date__year=year,
         date__month=month
-    ).aggregate(total=Sum('amount'))['total'] or 0
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
 
     # Sum all expenses for the month
     total_expense = Expense.objects.filter(
         user=user,
         date__year=year,
         date__month=month
-    ).aggregate(total=Sum('amount'))['total'] or 0
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
 
     recommended_spending = (total_income * Decimal('0.6')).quantize(Decimal('0.01'))
     recommended_saving = (total_income * Decimal('0.2')).quantize(Decimal('0.01'))
 
     # Calculate remaining after expenses
-    remaining = round(total_income - total_expense, 2)
-
+    remaining = (total_income - total_expense).quantize(Decimal('0.01'))
     return Response({
         "month": month,
         "year": year,
