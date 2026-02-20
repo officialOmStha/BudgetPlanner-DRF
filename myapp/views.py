@@ -104,6 +104,48 @@ def income_list_create(request):
 
         return Response(income_list, status=status.HTTP_200_OK)
     
+@api_view(['PUT', 'PATCH', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def income_detail(request, pk):
+    user = request.user
+
+    try:
+        income = Income.objects.get(pk=pk, user=user)
+    except Income.DoesNotExist:
+        return Response(
+            {"error": "Income not found."},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # UPDATE (Full update)
+    if request.method == 'PUT':
+        data = request.data
+        income.amount = data.get('amount', income.amount)
+        income.inc_category = data.get('inc_category', income.inc_category)
+        income.description = data.get('description', income.description)
+        income.date = data.get('date', income.date)
+        income.is_recurring = data.get('is_recurring', income.is_recurring)
+        income.save()
+
+        return Response({"message": "Income updated successfully."})
+
+    # PARTIAL UPDATE
+    elif request.method == 'PATCH':
+        data = request.data
+
+        for field in ['amount', 'inc_category', 'description', 'date', 'is_recurring']:
+            if field in data:
+                setattr(income, field, data[field])
+
+        income.save()
+        return Response({"message": "Income partially updated successfully."})
+
+    # DELETE
+    elif request.method == 'DELETE':
+        income.delete()
+        return Response({"message": "Income deleted successfully."},
+                        status=status.HTTP_204_NO_CONTENT)
+    
 @api_view(['POST', 'GET'])
 @permission_classes([IsAuthenticated])
 def expense_list_create(request):
@@ -156,6 +198,45 @@ def expense_list_create(request):
         } for i in expenses]
 
         return Response(expense_list, status = status.HTTP_200_OK)
+    
+@api_view(['PUT', 'PATCH', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def expense_detail(request, pk):
+    user = request.user
+
+    try:
+        expense = Expense.objects.get(pk=pk, user=user)
+    except Expense.DoesNotExist:
+        return Response(
+            {"error": "Expense not found."},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    if request.method == 'PUT':
+        data = request.data
+        expense.amount = data.get('amount', expense.amount)
+        expense.exp_category = data.get('exp_category', expense.exp_category)
+        expense.description = data.get('description', expense.description)
+        expense.date = data.get('date', expense.date)
+        expense.is_recurring = data.get('is_recurring', expense.is_recurring)
+        expense.save()
+
+        return Response({"message": "Expense updated successfully."})
+
+    elif request.method == 'PATCH':
+        data = request.data
+
+        for field in ['amount', 'exp_category', 'description', 'date', 'is_recurring']:
+            if field in data:
+                setattr(expense, field, data[field])
+
+        expense.save()
+        return Response({"message": "Expense partially updated successfully."})
+
+    elif request.method == 'DELETE':
+        expense.delete()
+        return Response({"message": "Expense deleted successfully."},
+                        status=status.HTTP_204_NO_CONTENT)
     
 
 @api_view(['GET'])
