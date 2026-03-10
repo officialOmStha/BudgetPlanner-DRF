@@ -238,38 +238,27 @@ def expense_detail(request, pk):
         return Response({"message": "Expense deleted successfully."},
                         status=status.HTTP_204_NO_CONTENT)
     
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def budget_view(request):
     user = request.user
 
-    # Get month and year from query params, default to current month
-    month = int(request.GET.get('month', datetime.now().month))
-    year = int(request.GET.get('year', datetime.now().year))
-
-    # Sum all incomes for the month
+    # Sum all incomes for the user
     total_income = Income.objects.filter(
-        user=user,
-        date__year=year,
-        date__month=month
+        user=user
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
 
-    # Sum all expenses for the month
+    # Sum all expenses for the user
     total_expense = Expense.objects.filter(
-        user=user,
-        date__year=year,
-        date__month=month
+        user=user
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
 
     recommended_spending = (total_income * Decimal('0.6')).quantize(Decimal('0.01'))
     recommended_saving = (total_income * Decimal('0.2')).quantize(Decimal('0.01'))
 
-    # Calculate remaining after expenses
     remaining = (total_income - total_expense).quantize(Decimal('0.01'))
+
     return Response({
-        "month": month,
-        "year": year,
         "total_income": str(total_income),
         "total_expense": str(total_expense),
         "recommended_spending": str(recommended_spending),
